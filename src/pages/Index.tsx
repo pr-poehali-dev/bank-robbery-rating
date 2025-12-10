@@ -18,6 +18,7 @@ interface RoundResult {
   roundNumber: number;
   time: number;
   isCorrect: boolean;
+  isBlitz: boolean;
   place: number;
   points: number;
 }
@@ -34,10 +35,10 @@ const PLACE_POINTS = [100, 75, 50];
 const Index = () => {
   const [teams, setTeams] = useState<TeamData[]>(INITIAL_TEAMS);
   const [currentRound, setCurrentRound] = useState(1);
-  const [roundData, setRoundData] = useState<{ time: string; isCorrect: boolean }[]>([
-    { time: '', isCorrect: true },
-    { time: '', isCorrect: true },
-    { time: '', isCorrect: true },
+  const [roundData, setRoundData] = useState<{ time: string; isCorrect: boolean; isBlitz: boolean }[]>([
+    { time: '', isCorrect: true, isBlitz: false },
+    { time: '', isCorrect: true, isBlitz: false },
+    { time: '', isCorrect: true, isBlitz: false },
   ]);
 
   const calculateRoundResults = () => {
@@ -46,6 +47,7 @@ const Index = () => {
         teamIdx: idx,
         time: parseFloat(data.time) || 999,
         isCorrect: data.isCorrect,
+        isBlitz: data.isBlitz,
       }))
       .filter((t) => t.time < 999);
 
@@ -56,13 +58,15 @@ const Index = () => {
       const placeIndex = sortedByTime.findIndex((t) => t.teamIdx === team.teamIdx);
       const placePoints = PLACE_POINTS[placeIndex] || 0;
       const correctMultiplier = team.isCorrect ? 1 : 0;
-      const points = correctMultiplier * coefficient * placePoints;
+      const blitzMultiplier = team.isBlitz ? 1 : 0;
+      const points = correctMultiplier * coefficient * placePoints * blitzMultiplier;
 
       return {
         teamIdx: team.teamIdx,
         roundNumber: currentRound,
         time: team.time,
         isCorrect: team.isCorrect,
+        isBlitz: team.isBlitz,
         place: placeIndex + 1,
         points,
       };
@@ -83,9 +87,9 @@ const Index = () => {
     setTeams(updatedTeams);
     setCurrentRound(currentRound + 1);
     setRoundData([
-      { time: '', isCorrect: true },
-      { time: '', isCorrect: true },
-      { time: '', isCorrect: true },
+      { time: '', isCorrect: true, isBlitz: false },
+      { time: '', isCorrect: true, isBlitz: false },
+      { time: '', isCorrect: true, isBlitz: false },
     ]);
   };
 
@@ -99,9 +103,9 @@ const Index = () => {
     setTeams(INITIAL_TEAMS);
     setCurrentRound(1);
     setRoundData([
-      { time: '', isCorrect: true },
-      { time: '', isCorrect: true },
-      { time: '', isCorrect: true },
+      { time: '', isCorrect: true, isBlitz: false },
+      { time: '', isCorrect: true, isBlitz: false },
+      { time: '', isCorrect: true, isBlitz: false },
     ]);
   };
 
@@ -206,7 +210,7 @@ const Index = () => {
                 {teams.map((team, idx) => (
                   <div key={idx} className="space-y-3 p-4 border border-primary/20 rounded bg-muted/20">
                     <h3 className="font-orbitron text-xl text-primary">{team.name}</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid md:grid-cols-3 gap-4">
                       <div>
                         <Label htmlFor={`time-${idx}`} className="font-mono">
                           Время (секунды)
@@ -241,6 +245,24 @@ const Index = () => {
                             className="mr-2"
                           />
                           {roundData[idx].isCorrect ? 'Правильно' : 'Неправильно'}
+                        </Button>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          variant={roundData[idx].isBlitz ? 'default' : 'outline'}
+                          onClick={() => {
+                            const newData = [...roundData];
+                            newData[idx].isBlitz = !newData[idx].isBlitz;
+                            setRoundData(newData);
+                          }}
+                          className="w-full font-mono"
+                        >
+                          <Icon
+                            name={roundData[idx].isBlitz ? 'Zap' : 'ZapOff'}
+                            size={18}
+                            className="mr-2"
+                          />
+                          {roundData[idx].isBlitz ? 'Блиц ON' : 'Блиц OFF'}
                         </Button>
                       </div>
                     </div>
@@ -281,7 +303,7 @@ const Index = () => {
                 <div className="bg-muted/30 p-6 rounded border border-primary/20">
                   <h3 className="font-orbitron text-xl text-primary mb-4">Формула расчёта:</h3>
                   <code className="block text-lg font-mono bg-background p-4 rounded border border-primary/30 neon-text">
-                    Баллы = Правильность × Коэффициент раунда × Баллы за место
+                    Баллы = Правильность × Коэффициент раунда × Баллы за место × Блиц
                   </code>
                 </div>
 
@@ -320,6 +342,17 @@ const Index = () => {
                       <p>🥉 3 место: 50 баллов</p>
                     </AccordionContent>
                   </AccordionItem>
+
+                  <AccordionItem value="blitz" className="border border-primary/20 rounded px-4">
+                    <AccordionTrigger className="font-orbitron hover:text-primary">
+                      <Icon name="Zap" size={20} className="mr-2 text-accent" />
+                      Блиц
+                    </AccordionTrigger>
+                    <AccordionContent className="font-mono text-muted-foreground">
+                      <p>⚡ Блиц активен = 1</p>
+                      <p>○ Блиц выключен = 0 (все баллы обнуляются!)</p>
+                    </AccordionContent>
+                  </AccordionItem>
                 </Accordion>
 
                 <div className="bg-accent/10 border border-accent/30 p-4 rounded">
@@ -328,9 +361,9 @@ const Index = () => {
                     Пример расчёта:
                   </h4>
                   <p className="font-mono text-sm text-muted-foreground">
-                    Команда ответила правильно (1) в раунде 3 (×2) и заняла 1 место (100 баллов)
+                    Команда ответила правильно (1) в раунде 3 (×2), заняла 1 место (100 баллов) и Блиц активен (1)
                     <br />
-                    Результат: 1 × 2 × 100 = <span className="text-primary font-bold">200 баллов</span>
+                    Результат: 1 × 2 × 100 × 1 = <span className="text-primary font-bold">200 баллов</span>
                   </p>
                 </div>
               </CardContent>
@@ -383,6 +416,12 @@ const Index = () => {
                               <Badge variant="secondary" className="font-mono">
                                 {round.place} место
                               </Badge>
+                              {round.isBlitz && (
+                                <Badge variant="default" className="font-mono bg-accent">
+                                  <Icon name="Zap" size={14} className="mr-1" />
+                                  Блиц
+                                </Badge>
+                              )}
                             </div>
                             <span className="text-2xl font-bold font-mono neon-text">
                               +{round.points}
